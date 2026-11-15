@@ -69,7 +69,6 @@ if (hasShot) {
   statusLine.textContent = describePhaseText(phase);
 } else {
   world.phase = PHASE_TITLE;
-  requestAnimationFrame(frame);
 }
 
 function describePhaseText(currentPhase) {
@@ -130,4 +129,9 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+// In shot mode the staged frame IS the screenshot, so the live loop
+// starts only for live play: in shot mode the world would keep moving
+// for the ~700ms until the browser captures it, a staged pulse would
+// fire, expire and eat the shards it was meant to show, and the shot
+// would depend on wall-clock timing instead of the staged state.
+if (!hasShot) requestAnimationFrame(frame);

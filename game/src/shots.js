@@ -5,9 +5,9 @@
 // fires its pulse when the shot is lined up. The same seed always gives
 // the same frame; no scene ever reads the clock or the mouse.
 
-import { FIELD_HEIGHT, FIELD_WIDTH, WAVES, shardsForWave } from './config.js';
+import { FIELD_HEIGHT, FIELD_WIDTH, PULSE, WAVES, shardsForWave } from './config.js';
 import { makeWorld, PHASE_GAMEOVER, PHASE_PLAYING, PHASE_TITLE, PHASE_VICTORY, resetWorld, startGame, stepWorld } from './world.js';
-import { KIND_ASTEROID, KIND_SHARD } from './objects.js';
+import { KIND_ASTEROID, KIND_COMET, KIND_SHARD, makeAsteroid } from './objects.js';
 
 const STEP = 1 / 60;
 const TITLE_SECONDS = 4;
@@ -130,6 +130,95 @@ function simulate(world, seconds, caution) {
 }
 
 /**
+ * Push any glowing object whose halo overlaps the 48px HUD band down
+ * below it, so no bright glow ever sits behind the top-bar text. The
+ * HUD background is semi-transparent, so a shard parked at the top of
+ * the field would otherwise shine straight through the wave indicator.
+ * Only used to stage screenshots; the world is never stepped again
+ * after staging, so nothing here changes how the game plays.
+ */
+const HUD_BOTTOM = 48;
+function glowRadius(entity) {
+  if (entity.kind === KIND_SHARD) return entity.radius * 2.2;
+  if (entity.kind === KIND_COMET) return entity.radius * 2.4;
+  return 0;
+}
+
+function clearTopBar(world) {
+  for (const entity of world.entities) {
+    if (!entity.alive) continue;
+    const glow = glowRadius(entity);
+    if (glow > 0 && entity.y - glow < HUD_BOTTOM) entity.y = HUD_BOTTOM + glow + 10;
+  }
+  if (world.comet && world.comet.alive) {
+    const glow = glowRadius(world.comet);
+    if (world.comet.y - glow < HUD_BOTTOM) world.comet.y = HUD_BOTTOM + glow + 10;
+  }
+}
+
+/**
+ * Stage the mid-play shot as a readable action scene: the drone at the
+ * centre of the field, a ring of shards around it, one asteroid nearby,
+ * and a salvage pulse visibly expanding. Only the staged screenshot
+ * state is rearranged — the drone's start position and movement in
+ * real play are untouched.
+ */
+function stagePlayShot(world) {
+  const drone = world.drone;
+  drone.x = FIELD_WIDTH / 2;
+  drone.y = 300;
+  drone.vx = 0;
+  drone.vy = 0;
+  drone.angle = -Math.PI / 2;
+  drone.trail = [
+    { x: 480, y: 318 },
+    { x: 479, y: 334 },
+    { x: 478, y: 350 },
+    { x: 477, y: 366 },
+  ];
+
+  const ring = [
+    [390, 240],
+    [575, 235],
+    [395, 375],
+    [580, 380],
+    [480, 185],
+  ];
+  let placed = 0;
+  for (const entity of world.entities) {
+    if (placed >= ring.length) break;
+    if (!entity.alive || entity.kind !== KIND_SHARD) continue;
+    [entity.x, entity.y] = ring[placed];
+    placed += 1;
+  }
+
+  let rock = null;
+  for (const entity of world.entities) {
+    if (entity.alive && entity.kind === KIND_ASTEROID) {
+      rock = entity;
+      break;
+    }
+  }
+  if (rock === null) {
+    rock = makeAsteroid(world.random, world.wave);
+    world.entities.push(rock);
+  }
+  rock.x = 655;
+  rock.y = 200;
+
+  world.pulses.push({
+    x: drone.x,
+    y: drone.y,
+    radius: 12 + (PULSE.maxRadius - 12) * 0.5,
+    maxRadius: PULSE.maxRadius,
+    age: PULSE.expandSeconds * 0.5,
+    doubled: false,
+  });
+
+  clearTopBar(world);
+}
+
+/**
  * Stage one named scene on `world` and return the phase to draw.
  * victory fast-forwards to the final wave, then lets the pilot finish it
  * through the real wave-clear path; gameover plays a careless pilot until
@@ -140,12 +229,21 @@ export function stageShot(name, world) {
     resetWorld(world, world.seed);
     startGame(world);
     simulate(world, PLAY_SECONDS, false);
+    if (world.phase === PHASE_PLAYING) stagePlayShot(world);
     return world.phase === PHASE_PLAYING ? PHASE_PLAYING : PHASE_GAMEOVER;
   }
   if (name === 'gameover') {
     resetWorld(world, world.seed);
     startGame(world);
     simulate(world, END_SECONDS, true);
+    if (world.phase === PHASE_GAMEOVER) {
+      clearTopBar(world);
+      // The final hit leaves a shake that the renderer draws with
+      // Math.random(); live play lets it decay in a third of a second,
+      // but a frozen screenshot would keep a random few-pixel offset
+      // forever, so the staged frame settles it to zero.
+      world.shakeSeconds = 0;
+    }
     return world.phase === PHASE_GAMEOVER ? PHASE_GAMEOVER : PHASE_PLAYING;
   }
   if (name === 'victory') {

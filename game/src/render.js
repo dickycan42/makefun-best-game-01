@@ -312,9 +312,14 @@ function drawCenteredLines(ctx, lines, startY, gap) {
 
 function drawTitle(ctx, world) {
   drawPanel(ctx, 180, 78, 600, 384);
+  // The two 58px title lines get their own wide gap: at the old shared
+  // 40px gap their glyphs touched. 78px leaves clear daylight between
+  // them, and the body lines below re-space to stay inside the panel.
   drawCenteredLines(ctx, [
     { text: 'STARFALL', font: 'bold 58px system-ui, sans-serif', color: PALETTE.goldBright },
     { text: 'SALVAGE', font: 'bold 58px system-ui, sans-serif', color: PALETTE.goldBright },
+  ], 116, 78);
+  drawCenteredLines(ctx, [
     { text: 'Catch the falling star shards. Dodge the asteroids.', font: '17px system-ui, sans-serif' },
     { text: 'Clear all 10 waves to win. A comet every 3rd wave is worth 250.', font: '17px system-ui, sans-serif' },
     { text: 'MOUSE or ARROWS / WASD — steer the drone', font: 'bold 16px system-ui, sans-serif', color: PALETTE.cyan },
@@ -322,7 +327,7 @@ function drawTitle(ctx, world) {
     { text: 'R — restart    M — sound on / off', font: '15px system-ui, sans-serif', color: PALETTE.textDim },
     { text: '★  BEST COMBO EARNS UP TO x5  ★', font: 'bold 15px system-ui, sans-serif', color: PALETTE.gold },
     { text: '— PRESS ENTER OR CLICK TO LAUNCH —', font: 'bold 18px system-ui, sans-serif', color: PALETTE.gold },
-  ], 122, 40);
+  ], 244, 33);
 }
 
 function drawEndScreen(ctx, world, victory) {
